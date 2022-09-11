@@ -4,6 +4,8 @@ Refactored version of SimpleQueueBot, which now can be used normally.
 # Документация
 Префикс бота - '!'.
 
+Ниже обязательные аргументы будут обозначаться как <argument>, а опциональные - как {argument}.
+
 `!help` - помощь по командам (перенаправляет сюда).
 
 `!ping` - выводит текущую задержку бота.

@@ -1,5 +1,5 @@
-import discord, asyncio, time, random, re
-from discord.ext import commands
+import discord, asyncio, time, random, re, pickle
+from discord.ext import commands, tasks
 
 ###############################################################
 
@@ -41,6 +41,8 @@ class Queue:
     def transfer(self, author, candidate): # 0 - not enough rights, 1 - success
         if author != self.creator:
             return 0
+        if candidate not in self.admins:
+            self.admins.append(candidate)
         self.creator = candidate
         return 1
 
@@ -96,7 +98,7 @@ class Queue:
 ###############################################################
 
 PREFIX = "!"
-VERSION = "v0.7 - Renovated v1 (08.09.22)"
+VERSION = "v0.7.1 - Renovated v1.1 (14.09.22)"
 FAIL_TEXT = "Что-то пошло не так..."
 SUCCESS_TEXT = "Получилось!"
 UPDATE_TEXT = "Очередь обновлена!"
@@ -104,6 +106,7 @@ NEXT_TEXT = "Следующий!"
 INFO_TEXT = "Вот что нашлось по Вашему запросу..."
 REACTION_TIME = 180
 PER_PAGE = 10
+BACKUP_PERIOD = 30
 TOKEN = ""
 with open("token.txt", "r") as f:
     TOKEN = f.read().split("\n")[0]
@@ -135,6 +138,16 @@ async def user_notification(queue: Queue):
     channel = await receiver.create_dm()
     await channel.send(f"Теперь вы первый в очереди {queue.get_name()}.")
 
+async def backup_load():
+    global queues
+    with open("backup.bot", "rb") as f:
+         queues = pickle.load(f)
+
+@tasks.loop(seconds=BACKUP_PERIOD)
+async def backup_save():
+    with open("backup.bot", "wb") as f:
+        pickle.dump(queues, f)
+
 @bot.command()
 async def help(ctx):
     await ctx.send(embed=create_embed("Помощь по командам", "https://github.com/tiom4eg/QueueBotV2/blob/main/README.md"))
@@ -153,6 +166,11 @@ async def version(ctx):
     await ctx.send(embed=create_embed("Текущая версия", VERSION))
 
 ###############################################################
+
+@bot.listen()
+async def on_ready():
+    await backup_load()
+    backup_save.start()
 
 @bot.command()
 async def create(ctx, name):
@@ -324,6 +342,8 @@ async def clear(ctx, name):
 async def all(ctx, *page: int):
     if not page:
         page = 0
+    else:
+        page = page[0]
     names = list(queues.keys())
     if page < 0:
         page = 0
@@ -361,6 +381,8 @@ async def info(ctx, name):
     if ctx.author.id in users:
         text += f"\nВаша позиция в очереди: {users.index(ctx.author.id) + 1}.\n"
     await ctx.send(ctx.author.mention, embed=create_embed(INFO_TEXT, text))
+
+
 
 ###############################################################
 

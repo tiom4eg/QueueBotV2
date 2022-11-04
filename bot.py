@@ -140,8 +140,12 @@ async def user_notification(queue: Queue):
 
 async def backup_load():
     global queues
+    try:
     with open("backup.bot", "rb") as f:
          queues = pickle.load(f)
+    except FileNotFoundError:
+        pass
+
 
 @tasks.loop(seconds=BACKUP_PERIOD)
 async def backup_save():

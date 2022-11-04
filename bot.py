@@ -47,7 +47,7 @@ class Queue:
         return 1
 
     def add_admin(self, author, candidate): # 0 - not enough rights, 1 - candidate already admin, 2 - success
-        if author != self.creator:
+        if author not in self.admins:
             return 0
         if candidate in self.admins:
             return 1
@@ -104,7 +104,7 @@ SUCCESS_TEXT = "Получилось!"
 UPDATE_TEXT = "Очередь обновлена!"
 NEXT_TEXT = "Следующий!"
 INFO_TEXT = "Вот что нашлось по Вашему запросу..."
-REACTION_TIME = 180
+REACTION_TIME = 120
 PER_PAGE = 10
 BACKUP_PERIOD = 30
 TOKEN = ""
@@ -145,8 +145,11 @@ async def backup_load():
 
 @tasks.loop(seconds=BACKUP_PERIOD)
 async def backup_save():
+    print("done")
     with open("backup.bot", "wb") as f:
         pickle.dump(queues, f)
+        f.close()
+    
 
 @bot.command()
 async def help(ctx):
@@ -176,64 +179,64 @@ async def on_ready():
 async def create(ctx, name):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очередь с таким (или очень похожим) именем уже существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очередь с таким (или очень похожим) именем уже существует."))
         return
     queue = Queue(ctx.author.id, name)
     queues[name] = queue
-    await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Вы успешно создали очередь `{name}`."))
+    await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Вы успешно создали очередь `{name}`."))
 
 @bot.command()
 async def delete(ctx, name):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     if ctx.author.id != queues[name].get_creator():
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
         return
     del queues[name]
-    await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Вы успешно удалили очередь `{name}`."))
+    await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Вы успешно удалили очередь `{name}`."))
 
 @bot.command()
 async def rename(ctx, name, new_name):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     new_name = re.sub("[^а-яa-z0-9-_]+", '_', new_name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].change_name(ctx.author.id, new_name)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"К сожалению, такое имя очереди уже занято."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"К сожалению, такое имя очереди уже занято."))
     elif status == 2:
-        await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Имя очереди `{name}` успешно изменено на `{new_name}`."))
+        await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Имя очереди `{name}` успешно изменено на `{new_name}`."))
 
 @bot.command()
 async def transfer(ctx, name, candidate: discord.User):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].transfer(ctx.author.id, candidate.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Вы успешно передали права создателя очереди `{name}` пользователю {candidate.mention}."))
+        await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Вы успешно передали права создателя очереди `{name}` пользователю {candidate.mention}."))
 
 @bot.command()
 async def promote(ctx, name, candidate: discord.User):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].add_admin(ctx.author.id, candidate.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"{candidate.mention} уже является администратором очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"{candidate.mention} уже является администратором очереди `{name}`."))
     elif status == 2:
-        await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Вы успешно сделали администратором очереди `{name}` пользователя {candidate.mention}."))
+        await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Вы успешно сделали администратором очереди `{name}` пользователя {candidate.mention}."))
 
 @bot.command()
 async def demote(ctx, name, *candidate: discord.User):
@@ -243,17 +246,17 @@ async def demote(ctx, name, *candidate: discord.User):
     else:
         candidate = candidate[0]
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].remove_admin(ctx.author.id, candidate.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь создателем очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"{candidate.mention} и так не является администратором очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"{candidate.mention} и так не является администратором очереди `{name}`."))
     elif status == 2:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Создатель очереди не может удалить самого себя из администраторов очереди."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Создатель очереди не может удалить самого себя из администраторов очереди."))
     elif status == 3:
-        await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Вы успешно забрали права администратора очереди `{name}` у пользователя {candidate.mention}."))
+        await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Вы успешно забрали права администратора очереди `{name}` у пользователя {candidate.mention}."))
 
 @bot.command()
 async def join(ctx, name, *candidate: discord.User):
@@ -263,15 +266,15 @@ async def join(ctx, name, *candidate: discord.User):
     else:
         candidate = candidate[0]
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].join_queue(ctx.author.id, candidate.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"{candidate.mention} уже находится в очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"{candidate.mention} уже находится в очереди `{name}`."))
     elif status == 2:
-        await ctx.send(ctx.author.mention, embed=create_embed(UPDATE_TEXT, f"{candidate.mention} успешно добавлен в конец очереди `{name}`."))
+        await ctx.send(embed=create_embed(UPDATE_TEXT, f"{candidate.mention} успешно добавлен в конец очереди `{name}`."))
         await admin_notification(queues[name], candidate, 0)
 
 @bot.command()
@@ -282,28 +285,28 @@ async def leave(ctx, name, *candidate: discord.User):
     else:
         candidate = candidate[0]
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].leave_queue(ctx.author.id, candidate.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"{candidate.mention} и так не находится в очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"{candidate.mention} и так не находится в очереди `{name}`."))
     elif status == 2:
-        await ctx.send(ctx.author.mention, embed=create_embed(UPDATE_TEXT, f"{candidate.mention} успешно удалён из очереди `{name}`."))
+        await ctx.send(embed=create_embed(UPDATE_TEXT, f"{candidate.mention} успешно удалён из очереди `{name}`."))
         await admin_notification(queues[name], candidate, 1)
 
 @bot.command()
 async def next(ctx, name):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].next_queue(ctx.author.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Очередь `{name}` сейчас пуста."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Очередь `{name}` сейчас пуста."))
     else:
         user = await bot.fetch_user(status)
         while True:
@@ -317,11 +320,11 @@ async def next(ctx, name):
                 await ctx.send(user.mention, embed=create_embed(FAIL_TEXT, f"Вы прозевали свою очередь..."))
                 status = queues[name].next_queue(ctx.author.id)
                 if status == 1:
-                    await ctx.send(ctx.author.mention, embed=create_embed(UPDATE_TEXT, f"Теперь очередь `{name}` пуста."))
+                    await ctx.send(embed=create_embed(UPDATE_TEXT, f"Теперь очередь `{name}` пуста."))
                     return
                 user = await bot.fetch_user(status)
             else:
-                await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"{user.mention} подтвердил, что готов к сдаче."))
+                await ctx.send(embed=create_embed(SUCCESS_TEXT, f"{user.mention} подтвердил, что готов к сдаче."))
                 if not queues[name].get_empty():
                     await user_notification(queues[name])
                 return
@@ -330,13 +333,13 @@ async def next(ctx, name):
 async def clear(ctx, name):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, "Очереди с таким именем не существует."))
         return
     status = queues[name].clear_queue(ctx.author.id)
     if status == 0:
-        await ctx.send(ctx.author.mention, embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
+        await ctx.send(embed=create_embed(FAIL_TEXT, f"Вы не являетесь администратором очереди `{name}`."))
     elif status == 1:
-        await ctx.send(ctx.author.mention, embed=create_embed(SUCCESS_TEXT, f"Очередь `{name}` очищена."))
+        await ctx.send(embed=create_embed(SUCCESS_TEXT, f"Очередь `{name}` очищена."))
 
 @bot.command()
 async def all(ctx, *page: int):
@@ -354,33 +357,29 @@ async def all(ctx, *page: int):
         queue = queues[names[i]]
         creator = await bot.fetch_user(queue.get_creator())
         text += f"Очередь `{queue.get_name()}`\nСоздатель: {creator.name}\nПользователей в очереди: {len(queue.get_queue())}\n\n"
-    await ctx.send(ctx.author.mention, embed=create_embed(INFO_TEXT, text))
+    await ctx.send(embed=create_embed(INFO_TEXT, text))
 
 @bot.command()
 async def info(ctx, name):
     name = re.sub("[^а-яa-z0-9-_]+", '_', name.lower())
     if name not in queues:
-        await ctx.send(ctx.author.mention, embed=create_embed(INFO_TEXT, "Очереди с таким именем не существует."))
+        await ctx.send(embed=create_embed(INFO_TEXT, "Очереди с таким именем не существует."))
         return
     queue = queues[name]
     creator = await bot.fetch_user(queue.get_creator())
     admins = queue.get_admins()
     users = queue.get_queue()
     text = f"Очередь `{name}`\nСоздатель:\n{creator.name}\nАдминистраторы ({len(admins)}):\n"
-    for i in range(min(PER_PAGE / 2, len(admins))):
+    for i in range(len(admins)):
         user = await bot.fetch_user(admins[i])
         text += user.name + "\n"
-    if len(admins) > PER_PAGE / 2:
-        text += "...\n"
     text += f"Пользователи в очереди ({len(users)}):\n"
-    for i in range(min(PER_PAGE, len(users))):
+    for i in range(len(users)):
         user = await bot.fetch_user(users[i])
         text += user.name + "\n"
-    if len(users) > PER_PAGE:
-        text += "...\n"
     if ctx.author.id in users:
         text += f"\nВаша позиция в очереди: {users.index(ctx.author.id) + 1}.\n"
-    await ctx.send(ctx.author.mention, embed=create_embed(INFO_TEXT, text))
+    await ctx.send(embed=create_embed(INFO_TEXT, text))
 
 
 

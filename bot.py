@@ -327,13 +327,17 @@ async def next(ctx, name):
                 return ctx.author in after.channel.members
 
             try:
-                await asyncio.wait([
+                done, pending = await asyncio.wait([
                     asyncio.create_task(bot.wait_for(
                         'reaction_add', timeout=float(REACTION_TIME), check=add_reaction_check)),
                     asyncio.create_task(bot.wait_for(
                         'voice_state_update', timeout=float(REACTION_TIME), check=join_vc_check))
                 ], return_when=asyncio.FIRST_COMPLETED)
 
+                for task in done:
+                    await task
+                for task in pending:
+                    task.cancel()
             except asyncio.TimeoutError:
                 await ctx.send(user.mention, embed=create_embed(FAIL_TEXT, f"Вы прозевали свою очередь..."))
                 status = queues[name].next_queue(ctx.author.id)

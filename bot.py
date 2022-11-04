@@ -141,8 +141,8 @@ async def user_notification(queue: Queue):
 async def backup_load():
     global queues
     try:
-    with open("backup.bot", "rb") as f:
-         queues = pickle.load(f)
+        with open("backup.bot", "rb") as f:
+            queues = pickle.load(f)
     except FileNotFoundError:
         pass
 
@@ -313,10 +313,27 @@ async def next(ctx, name):
         while True:
             message = await ctx.send(user.mention, embed=create_embed(NEXT_TEXT, f"Настала Ваша очередь, отреагируйте 👍 под этим сообщением в течение {REACTION_TIME} секунд, чтобы удостовериться, что Вы Всё ещё с нами."))
             await message.add_reaction('👍')
-            def check(reaction, sender):
+
+            def add_reaction_check(reaction, sender):
                 return sender == user and str(reaction.emoji) == '👍'
+
+            def join_vc_check(member, before, after):
+                if member != user:
+                    return False
+
+                if after.channel == None:
+                    return False
+
+                return ctx.author in after.channel.members
+
             try:
-                reaction, sender = await bot.wait_for('reaction_add', timeout=float(REACTION_TIME), check=check)
+                await asyncio.wait([
+                    asyncio.create_task(bot.wait_for(
+                        'reaction_add', timeout=float(REACTION_TIME), check=add_reaction_check)),
+                    asyncio.create_task(bot.wait_for(
+                        'voice_state_update', timeout=float(REACTION_TIME), check=join_vc_check))
+                ], return_when=asyncio.FIRST_COMPLETED)
+
             except asyncio.TimeoutError:
                 await ctx.send(user.mention, embed=create_embed(FAIL_TEXT, f"Вы прозевали свою очередь..."))
                 status = queues[name].next_queue(ctx.author.id)
